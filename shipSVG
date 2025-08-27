@@ -1,0 +1,40 @@
+Ship SVG :=
+VAR Actual = [Actual Count]
+VAR Required = [Required Count]
+VAR pct =
+    VAR r = DIVIDE(Actual, Required, 0)
+    RETURN MIN ( 1, MAX ( 0, r ) )           -- clamp 0..1
+VAR w = 260
+VAR h = 110
+VAR fillW = INT ( w * pct )
+VAR FillColour =
+    SWITCH (
+        TRUE (),
+        pct >= 1,   "#2e7d32",   -- green
+        pct >= 0.8, "#ed6c02",   -- amber
+                    "#c62828"    -- red
+    )
+RETURN
+"data:image/svg+xml;utf8," &
+"<svg xmlns='http://www.w3.org/2000/svg' width='" & w & "' height='" & h & "' viewBox='0 0 " & w & " " & h & "'>" &
+" <defs>" &
+"  <clipPath id='shipClip'>" &
+"   <polygon points='10,80 200,80 230,70 245,80 245,95 10,95' />" &  -- hull
+"   <rect x='90' y='55' width='60' height='25' />" &                 -- superstructure
+"   <polygon points='150,55 168,40 175,55' />" &                     -- mast
+"  </clipPath>" &
+" </defs>" &
+" <rect width='" & w & "' height='" & h & "' fill='transparent'/>" &
+" <g clip-path='url(#shipClip)'>" &
+"   <rect x='0' y='0' width='" & w & "' height='" & h & "' fill='#e0e0e0'/>" &  -- grey ship
+"   <rect x='0' y='0' width='" & fillW & "' height='" & h & "' fill='" & FillColour & "'/>" & -- progress fill
+" </g>" &
+" <g fill='none' stroke='#555' stroke-width='2'>" &  -- outline for crisp edges
+"   <polygon points='10,80 200,80 230,70 245,80 245,95 10,95' />" &
+"   <rect x='90' y='55' width='60' height='25' />" &
+"   <polygon points='150,55 168,40 175,55' />" &
+" </g>" &
+" <text x='" & w/2 & "' y='20' text-anchor='middle' font-family='Segoe UI' font-size='16' fill='#333'>" &
+      FORMAT(Actual, "#,0") & " / " & FORMAT(Required, "#,0") & " (" & FORMAT(pct, "0%") & ")" &
+"</text>" &
+"</svg>"

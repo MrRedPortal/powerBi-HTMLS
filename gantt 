@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MIC Branch Gantt</title>
+  <link rel="stylesheet" href="https://unpkg.com/frappe-gantt/dist/frappe-gantt.css">
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    #gantt { overflow-x: scroll; }
+  </style>
+</head>
+<body>
+
+<h2>MIC Branch Gantt</h2>
+<p>Select your MIC Branch Excel file:</p>
+<input type="file" id="fileInput" />
+
+<div id="gantt"></div>
+
+<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/frappe-gantt/dist/frappe-gantt.min.js"></script>
+<script>
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data, { type: 'array' });
+    
+    // Change this to your sheet name
+    const sheet = workbook.Sheets['MIC Branch'];
+    const json = XLSX.utils.sheet_to_json(sheet);
+
+    // Build tasks for Frappe Gantt
+    const tasks = [];
+    const projectRows = {}; // Track Y-position per project
+    let rowCounter = 0;
+
+    json.forEach((row, i) => {
+        const project = row['Project'] || 'No Project';
+        if (!(project in projectRows)) projectRows[project] = rowCounter++;
+
+        const start = new Date(row['Start Date']);
+        const duration = parseInt(row['Duration']);
+        const end = new Date(start);
+        end.setDate(end.getDate() + duration);
+
+        tasks.push({
+            id: `task${i}`,
+            name: row['Task'],
+            start: start.toISOString().split('T')[0],
+            end: end.toISOString().split('T')[0],
+            project: project,
+            progress: 0,
+            custom_class: `project${projectRows[project]}`
+        });
+    });
+
+    // Inject some simple colors per project
+    const style = document.createElement('style');
+    Object.keys(projectRows).forEach((proj, idx) => {
+        style.innerHTML += `.project${idx} .bar { fill: hsl(${idx*50 % 360}, 70%, 60%) !important; }\n`;
+    });
+    document.head.appendChild(style);
+
+    new Gantt("#gantt", tasks, {
+        view_mode: 'Day',
+        custom_popup_html: task => `<b>${task.name}</b><br>Project: ${task.project}`
+    });
+});
+</script>
+
+</body>
+</html>

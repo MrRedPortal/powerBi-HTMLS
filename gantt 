@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>MIC Branch Gantt</title>
+  <title>MIC Branch Gantt - CSV Version</title>
   <link rel="stylesheet" href="https://unpkg.com/frappe-gantt/dist/frappe-gantt.css">
   <style>
     body { font-family: Arial; margin: 20px; }
@@ -12,98 +12,88 @@
 </head>
 <body>
 
-<h2>MIC Branch Gantt</h2>
+<h2>MIC Branch Gantt (CSV)</h2>
 
-<p>Select your Excel file:</p>
-<input type="file" id="fileInput" />
-<br/>
-<p>Select sheet:</p>
-<select id="sheetSelect"></select>
-
+<p>Select your CSV file:</p>
+<input type="file" id="fileInput" accept=".csv" />
 <div id="gantt"></div>
 
-<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/frappe-gantt/dist/frappe-gantt.min.js"></script>
 <script>
-let workbook;
-
-document.getElementById('fileInput').addEventListener('change', async (e) => {
+document.getElementById('fileInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const data = await file.arrayBuffer();
-    workbook = XLSX.read(data, { type: 'array' });
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const text = event.target.result;
+        const rows = text.split(/\r?\n/).filter(r => r.trim() !== '');
+        if (rows.length < 2) {
+            alert("CSV appears empty or invalid.");
+            return;
+        }
 
-    // populate sheet selector
-    const sheetSelect = document.getElementById('sheetSelect');
-    sheetSelect.innerHTML = '';
-    workbook.SheetNames.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        sheetSelect.appendChild(option);
-    });
+        // Parse CSV headers
+        const headers = rows[0].split(',').map(h => h.trim());
+        const dataRows = rows.slice(1);
 
-    // automatically load first sheet
-    loadSheet(sheetSelect.value);
-});
-
-document.getElementById('sheetSelect').addEventListener('change', (e) => {
-    if (workbook) loadSheet(e.target.value);
-});
-
-function parseExcelDate(str) {
-    // handle mon 12/05/26 format
-    if (!str) return new Date();
-    const parts = str.toString().split(' ');
-    if (parts.length < 2) return new Date(str);
-    const [day, month, year] = parts[1].split('/');
-    return new Date(`20${year}-${month}-${day}`);
-}
-
-function loadSheet(sheetName) {
-    const sheet = workbook.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(sheet);
-    if (json.length === 0) return;
-
-    const tasks = [];
-    const projectRows = {};
-    let rowCounter = 0;
-
-    json.forEach((row, i) => {
-        const project = row['Project'] || 'No Project';
-        if (!(project in projectRows)) projectRows[project] = rowCounter++;
-
-        const start = parseExcelDate(row['Start Date']);
-        const duration = parseInt(row['Duration']) || 1;
-        const end = new Date(start);
-        end.setDate(end.getDate() + duration);
-
-        tasks.push({
-            id: `task${i}`,
-            name: row['Task'] || `Task ${i+1}`,
-            start: start.toISOString().split('T')[0],
-            end: end.toISOString().split('T')[0],
-            project: project,
-            progress: 0,
-            custom_class: `project${projectRows[project]}`
+        const json = dataRows.map(r => {
+            const cols = r.split(',');
+            const obj = {};
+            headers.forEach((h, i) => obj[h] = cols[i]);
+            return obj;
         });
-    });
 
-    // inject simple colors per project
-    const style = document.createElement('style');
-    Object.keys(projectRows).forEach((proj, idx) => {
-        style.innerHTML += `.project${idx} .bar { fill: hsl(${idx*50 % 360}, 70%, 60%) !important; }\n`;
-    });
-    document.head.appendChild(style);
+        // Build tasks
+        const tasks = [];
+        const projectRows = {};
+        let rowCounter = 0;
 
-    // clear previous Gantt
-    document.getElementById('gantt').innerHTML = '';
-    new Gantt("#gantt", tasks, {
-        view_mode: 'Day',
-        custom_popup_html: task => `<b>${task.name}</b><br>Project: ${task.project}`
-    });
-}
+        function parseDate(str) {
+            if (!str) return new Date();
+            // handle mon 12/05/26
+            const parts = str.split(' ');
+            if (parts.length < 2) return new Date(str);
+            const [day, month, year] = parts[1].split('/');
+            return new Date(`20${year}-${month}-${day}`);
+        }
+
+        json.forEach((row, i) => {
+            const project = row['Project'] || 'No Project';
+            if (!(project in projectRows)) projectRows[project] = rowCounter++;
+
+            const start = parseDate(row['Start Date']);
+            const duration = parseInt(row['Duration']) || 1;
+            const end = new Date(start);
+            end.setDate(end.getDate() + duration);
+
+            tasks.push({
+                id: `task${i}`,
+                name: row['Task'] || `Task ${i+1}`,
+                start: start.toISOString().split('T')[0],
+                end: end.toISOString().split('T')[0],
+                project: project,
+                progress: 0,
+                custom_class: `project${projectRows[project]}`
+            });
+        });
+
+        // inject simple colors per project
+        const style = document.createElement('style');
+        Object.keys(projectRows).forEach((proj, idx) => {
+            style.innerHTML += `.project${idx} .bar { fill: hsl(${idx*50 % 360}, 70%, 60%) !important; }\n`;
+        });
+        document.head.appendChild(style);
+
+        // clear previous Gantt
+        document.getElementById('gantt').innerHTML = '';
+        new Gantt("#gantt", tasks, {
+            view_mode: 'Day',
+            custom_popup_html: task => `<b>${task.name}</b><br>Project: ${task.project}`
+        });
+    };
+    reader.readAsText(file);
+});
 </script>
 
 </body>
